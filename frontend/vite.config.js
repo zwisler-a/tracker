@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Time Block Tracker',
+        name: 'Time Tracker',
         short_name: 'Tracker',
         description: 'Track your time in 30-minute blocks',
         theme_color: '#6366f1',

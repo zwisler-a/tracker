@@ -12,7 +12,7 @@ function formatRange(startDate, dayCount) {
 
 const iconBtn = 'w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 active:bg-slate-200 dark:active:bg-zinc-700 transition-colors'
 
-export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavigate, onSettings, dark, onToggleDark }) {
+export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavigate, onSettings, dark, onToggleDark, onLogout }) {
   const navigate = (delta) => onNavigate(addDays(startDate, delta * dayCount))
 
   return (
@@ -46,6 +46,9 @@ export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavig
         {dark ? '☀︎' : '☾'}
       </button>
       <button onClick={onSettings} className={iconBtn}>⚙</button>
+      {onLogout && (
+        <button onClick={onLogout} className={iconBtn} title="Lock">⏏</button>
+      )}
     </div>
   )
 }

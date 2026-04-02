@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { existsSync } from 'fs'
 import './db.js'
+import { requireAuth } from './middleware/auth.js'
+import authRouter from './routes/auth.js'
 import categoriesRouter from './routes/categories.js'
 import entriesRouter from './routes/entries.js'
 
@@ -11,8 +13,12 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-app.use('/api/categories', categoriesRouter)
-app.use('/api/entries', entriesRouter)
+// Public
+app.use('/api/auth', authRouter)
+
+// Protected
+app.use('/api/categories', requireAuth, categoriesRouter)
+app.use('/api/entries',    requireAuth, entriesRouter)
 
 // Serve frontend static files in production (single-container deployment)
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public')

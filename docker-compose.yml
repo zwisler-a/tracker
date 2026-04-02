@@ -7,4 +7,5 @@ services:
       - ./data:/app/data
     environment:
       - DB_PATH=/app/data/tracker.db
+      - AUTH_PASSWORD=changeme   # set your password here
     restart: unless-stopped

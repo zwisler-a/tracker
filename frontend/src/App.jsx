@@ -3,6 +3,8 @@ import { fetchCategories } from './api.js'
 import { todayStr, addDays } from './utils/dates.js'
 import { useUsageCounts } from './hooks/useUsageCounts.js'
 import { useDarkMode } from './hooks/useDarkMode.js'
+import { useAuth } from './hooks/useAuth.js'
+import Login from './components/Login.jsx'
 import Grid from './components/Grid.jsx'
 import Toolbar from './components/Toolbar.jsx'
 import CategoryLegend from './components/CategoryLegend.jsx'
@@ -21,6 +23,9 @@ export default function App() {
 
   const { counts, increment } = useUsageCounts()
   const [dark, toggleDark] = useDarkMode()
+  const { token, login, logout } = useAuth()
+
+  if (!token) return <Login onLogin={login} />
 
   const loadCategories = () => fetchCategories().then(setCategories)
 
@@ -50,6 +55,7 @@ export default function App() {
         onSettings={() => setView('settings')}
         dark={dark}
         onToggleDark={toggleDark}
+        onLogout={logout}
       />
       <Grid
         startDate={startDate}
