@@ -10,10 +10,10 @@ cd backend && npm install && npm run dev   # API on :3000
 cd frontend && npm install && npm run dev  # UI on :5173 (proxies /api → :3000)
 ```
 
-**Docker (production-like):**
+**Docker (single container, production):**
 ```bash
 docker compose up --build
-# frontend → http://localhost, backend → http://localhost:3000
+# app → http://localhost  (Express serves API + frontend from one container)
 ```
 
 The `data/` directory is created automatically and holds `tracker.db`. It is gitignored.

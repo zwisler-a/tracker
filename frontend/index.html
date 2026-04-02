@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <title>Time Block Tracker</title>
+    <meta name="theme-color" content="#6366f1"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="Tracker"/>
+    <link rel="apple-touch-icon" href="/icon.svg"/>
+    <script>
+      // Apply dark class before first paint to avoid flash
+      const saved = localStorage.getItem('dark_mode')
+      const isDark = saved !== null
+        ? saved === 'true'
+        : window.matchMedia('(prefers-color-scheme: dark)').matches
+      if (isDark) document.documentElement.classList.add('dark')
+    </script>
   </head>
   <body>
     <div id="root"></div>
