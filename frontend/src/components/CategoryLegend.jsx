@@ -24,7 +24,7 @@ export default function CategoryLegend({ categories, activeCategory, onSelect, u
   return (
     <>
       <div className="h-16"></div>
-      <div className="bottom-0 fixed w-full shrink-0 bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-700 px-2 py-2 flex items-center gap-1.5">
+      <div className="z-40 bottom-0 fixed w-full shrink-0 bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-700 px-2 py-2 flex items-center gap-1.5">
         {categories.length === 0 ? (
           <span className="flex-1 text-xs text-slate-400 dark:text-zinc-500 text-center py-1">
             No categories yet — add one in ⚙ settings
