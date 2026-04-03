@@ -48,9 +48,11 @@ export default function Insights({ categories }) {
   })
   const dailyData = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date))
 
-  // Time-of-day counts
-  const slotCounts = Array(48).fill(0)
-  entries.forEach(e => { if (e.category_id) slotCounts[e.slot]++ })
+  // Time-of-day category distribution
+  const slotCatCounts = Array.from({ length: 48 }, () => ({}))
+  entries.forEach(e => {
+    if (e.category_id) slotCatCounts[e.slot][e.category_id] = (slotCatCounts[e.slot][e.category_id] || 0) + 1
+  })
 
   const totalHours = entries.filter(e => e.category_id).length * 0.5
   const activeDays = new Set(entries.filter(e => e.category_id).map(e => e.date)).size
@@ -100,7 +102,7 @@ export default function Insights({ categories }) {
 
         <CategoryDonut catData={catData} totalHours={totalHours} />
         <DailyBars dailyData={dailyData} catData={catData} days={days} />
-        <TimeHeatmap slotCounts={slotCounts} />
+        <TimeHeatmap slotCatCounts={slotCatCounts} catData={catData} />
       </div>
     </div>
   )

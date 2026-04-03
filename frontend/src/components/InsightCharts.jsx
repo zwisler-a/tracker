@@ -73,30 +73,48 @@ export function DailyBars({ dailyData, catData, days }) {
   )
 }
 
-export function TimeHeatmap({ slotCounts }) {
-  const max = Math.max(...slotCounts, 1)
-  const hours = Array.from({ length: 24 }, (_, h) => ({
-    label: `${String(h).padStart(2, '0')}:00`,
-    count: slotCounts[h * 2] + slotCounts[h * 2 + 1],
-  }))
-  const maxHour = Math.max(...hours.map(h => h.count), 1)
+export function TimeHeatmap({ slotCatCounts, catData }) {
+  // Merge two half-hour slots into one hour bucket
+  const hours = Array.from({ length: 24 }, (_, h) => {
+    const merged = {}
+    ;[slotCatCounts[h * 2], slotCatCounts[h * 2 + 1]].forEach(slot => {
+      Object.entries(slot).forEach(([id, n]) => { merged[id] = (merged[id] || 0) + n })
+    })
+    const total = Object.values(merged).reduce((s, n) => s + Number(n), 0)
+    return { label: `${String(h).padStart(2, '0')}:00`, merged, total }
+  })
+  const maxTotal = Math.max(...hours.map(h => h.total), 1)
 
   return (
     <div className={card}>
       <p className={sectionLabel}>Time of Day</p>
       <div className="space-y-1">
-        {hours.map(({ label, count }) => (
-          <div key={label} className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 dark:text-zinc-500 w-10 text-right shrink-0">{label}</span>
-            <div className="flex-1 h-3 rounded-full bg-slate-100 dark:bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-indigo-500 dark:bg-indigo-400 transition-all"
-                style={{ width: `${(count / maxHour) * 100}%`, opacity: count === 0 ? 0 : 0.3 + 0.7 * (count / maxHour) }}
-              />
+        {hours.map(({ label, merged, total }) => {
+          const segments = catData
+            .filter(d => merged[d.id])
+            .map(d => ({ color: d.color, pct: (merged[d.id] / total) * 100 }))
+          return (
+            <div key={label} className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 w-10 text-right shrink-0">{label}</span>
+              <div className="flex-1 h-3 rounded-full bg-slate-100 dark:bg-zinc-800 overflow-hidden flex">
+                {total === 0
+                  ? null
+                  : segments.map((seg, i) => (
+                    <div
+                      key={i}
+                      className="h-full transition-all"
+                      style={{
+                        width: `${seg.pct * (total / maxTotal)}%`,
+                        backgroundColor: seg.color,
+                        opacity: 0.4 + 0.6 * (total / maxTotal),
+                      }}
+                    />
+                  ))
+                }
+              </div>
             </div>
-            {count > 0 && <span className="text-[10px] text-slate-400 dark:text-zinc-500 w-6 shrink-0">{count}</span>}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
