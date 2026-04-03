@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { addDays } from '../utils/dates.js'
 
 function formatRange(startDate, dayCount) {
@@ -12,14 +13,15 @@ function formatRange(startDate, dayCount) {
 
 const iconBtn = 'w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 active:bg-slate-200 dark:active:bg-zinc-700 transition-colors'
 
-export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavigate, onSettings, dark, onToggleDark, onLogout }) {
-  const navigate = (delta) => onNavigate(addDays(startDate, delta * dayCount))
+export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavigate }) {
+  const routerNavigate = useNavigate()
+  const shift = (delta) => onNavigate(addDays(startDate, delta * dayCount))
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-700 shrink-0">
       <div className="flex items-center gap-1">
-        <button onClick={() => navigate(-1)} className={iconBtn}>‹</button>
-        <button onClick={() => navigate(1)}  className={iconBtn}>›</button>
+        <button onClick={() => shift(-1)} className={iconBtn}>‹</button>
+        <button onClick={() => shift(1)}  className={iconBtn}>›</button>
       </div>
 
       <span className="flex-1 text-sm font-medium text-slate-700 dark:text-zinc-200 text-center select-none">
@@ -42,13 +44,7 @@ export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavig
         ))}
       </div>
 
-      <button onClick={onToggleDark} className={iconBtn} title="Toggle dark mode">
-        {dark ? '☀︎' : '☾'}
-      </button>
-      <button onClick={onSettings} className={iconBtn}>⚙</button>
-      {onLogout && (
-        <button onClick={onLogout} className={iconBtn} title="Lock">⏏</button>
-      )}
+      <button onClick={() => routerNavigate('/settings')} className={iconBtn}>⚙</button>
     </div>
   )
 }

@@ -9,7 +9,7 @@ const authHeader = () => {
 const handle = async (res) => {
   if (res.status === 401) {
     localStorage.removeItem('auth_token')
-    window.location.reload()
+    window.location.href = '/login'
     return Promise.reject(new Error('Unauthorized'))
   }
   return res.json()

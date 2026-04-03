@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { createCategory, updateCategory, deleteCategory } from '../api.js'
 
 const PRESET_COLORS = [
@@ -44,7 +45,9 @@ function ColorPicker({ value, onChange }) {
   )
 }
 
-export default function Settings({ categories, onBack }) {
+export default function Settings({ categories, onDone, dark, onToggleDark, onLogout }) {
+  const navigate = useNavigate()
+  const back = () => { onDone?.(); navigate('/') }
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName]   = useState('')
   const [editColor, setEditColor] = useState('')
@@ -64,21 +67,21 @@ export default function Settings({ categories, onBack }) {
     if (!editName.trim()) return
     await updateCategory(id, { name: editName.trim(), color: editColor })
     setEditingId(null)
-    onBack()
+    back()
   }
 
   const handleAdd = async () => {
     if (!newName.trim()) return
     await createCategory({ name: newName.trim(), color: newColor })
     setNewName('')
-    onBack()
+    back()
   }
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this category? Logged entries will become unlogged.')) return
     await deleteCategory(id)
     setEditingId(null)
-    onBack()
+    back()
   }
 
   return (
@@ -86,12 +89,32 @@ export default function Settings({ categories, onBack }) {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-700 shrink-0">
         <button
-          onClick={onBack}
+          onClick={back}
           className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors text-lg leading-none"
         >
           ‹
         </button>
-        <h1 className="font-semibold text-slate-800 dark:text-zinc-100">Categories</h1>
+        <h1 className="font-semibold text-slate-800 dark:text-zinc-100">Settings</h1>
+        <div className="ml-auto flex items-center gap-1">
+          {onToggleDark && (
+            <button
+              onClick={onToggleDark}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Toggle dark mode"
+            >
+              {dark ? '☀︎' : '☾'}
+            </button>
+          )}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Lock"
+            >
+              ⏏
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Category list */}
