@@ -50,4 +50,4 @@ jobs:
       - name: Trigger n8n workflow
         run: |
           curl -u "${{ secrets.N8N_USER }}:${{ secrets.N8N_PASS }}" \
-            "https://n8n.zwisler.dev/webhook-test/7d99db0b-facf-4933-9277-d47e2f05e249?tag=${{ steps.tag.outputs.TAG }}"
+            "https://n8n.zwisler.dev/webhook/7d99db0b-facf-4933-9277-d47e2f05e249?tag=${{ steps.tag.outputs.TAG }}"
