@@ -22,17 +22,25 @@ export default function Insights({ categories }) {
   const navigate = useNavigate()
   const [days, setDays] = useState(30)
   const [entries, setEntries] = useState([])
+  const [excluded, setExcluded] = useState(new Set())
   const today = todayStr()
 
   useEffect(() => {
     fetchEntries(addDays(today, -(days - 1)), today).then(setEntries)
   }, [days])
 
+  const toggleExclude = (id) => setExcluded(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const categoryMap = Object.fromEntries(categories.map(c => [c.id, c]))
+  const visible = entries.filter(e => !excluded.has(e.category_id))
 
   // Category totals
   const catHours = {}
-  entries.forEach(e => {
+  visible.forEach(e => {
     if (e.category_id) catHours[e.category_id] = (catHours[e.category_id] || 0) + 0.5
   })
   const catData = Object.entries(catHours)
@@ -42,7 +50,7 @@ export default function Insights({ categories }) {
 
   // Daily data for stacked bar
   const dailyMap = {}
-  entries.forEach(e => {
+  visible.forEach(e => {
     if (!dailyMap[e.date]) dailyMap[e.date] = { date: e.date, label: e.date.slice(5) }
     if (e.category_id) dailyMap[e.date][e.category_id] = (dailyMap[e.date][e.category_id] || 0) + 0.5
   })
@@ -50,13 +58,17 @@ export default function Insights({ categories }) {
 
   // Time-of-day category distribution
   const slotCatCounts = Array.from({ length: 48 }, () => ({}))
-  entries.forEach(e => {
+  visible.forEach(e => {
     if (e.category_id) slotCatCounts[e.slot][e.category_id] = (slotCatCounts[e.slot][e.category_id] || 0) + 1
   })
 
-  const totalHours = entries.filter(e => e.category_id).length * 0.5
-  const activeDays = new Set(entries.filter(e => e.category_id).map(e => e.date)).size
+  const totalHours = visible.filter(e => e.category_id).length * 0.5
+  const activeDays = new Set(visible.filter(e => e.category_id).map(e => e.date)).size
   const topCat = catData[0]
+
+  // All categories that appear in raw entries (for filter chips)
+  const allCatIds = [...new Set(entries.map(e => e.category_id).filter(Boolean))]
+  const allCats = allCatIds.map(id => categoryMap[id]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 dark:bg-zinc-950">
@@ -88,6 +100,29 @@ export default function Insights({ categories }) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-4 space-y-3">
+        {/* Category filter chips */}
+        {allCats.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {allCats.map(cat => {
+              const off = excluded.has(cat.id)
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => toggleExclude(cat.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                    off
+                      ? 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-400 dark:text-zinc-500 line-through'
+                      : 'border-transparent text-white'
+                  }`}
+                  style={off ? {} : { backgroundColor: cat.color }}
+                >
+                  {!off && <span className="w-1.5 h-1.5 rounded-full bg-white/50" />}
+                  {cat.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard label="Hours tracked" value={totalHours.toFixed(1)} sub={`last ${days} days`} />
