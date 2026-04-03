@@ -10,6 +10,7 @@ import Grid from './components/Grid.jsx'
 import Toolbar from './components/Toolbar.jsx'
 import CategoryLegend from './components/CategoryLegend.jsx'
 import Settings from './components/Settings.jsx'
+import Insights from './components/Insights.jsx'
 
 function startForDayCount(dayCount) {
   return addDays(todayStr(), -Math.floor(dayCount / 2))
@@ -74,6 +75,11 @@ export default function App() {
     <Routes>
       <Route path="/login" element={
         token ? <Navigate to="/" replace /> : <Login />
+      } />
+      <Route path="/insights" element={
+        <RequireAuth>
+          <Insights categories={categories} />
+        </RequireAuth>
       } />
       <Route path="/settings" element={
         <RequireAuth>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchEntries, upsertEntry } from '../api.js'
 import { addDays, todayStr } from '../utils/dates.js'
 
@@ -17,6 +17,8 @@ function formatDayHeader(dateStr) {
 
 export default function Grid({ startDate, dayCount, categories, activeCategory, onPaint }) {
   const [entries, setEntries] = useState({})
+  const isDragging = useRef(false)
+  const paintMode = useRef('paint') // 'paint' | 'erase'
 
   const dates = Array.from({ length: dayCount }, (_, i) => addDays(startDate, i))
   const endDate = dates[dates.length - 1]
@@ -29,21 +31,40 @@ export default function Grid({ startDate, dayCount, categories, activeCategory, 
     })
   }, [startDate, endDate])
 
+  useEffect(() => {
+    const stop = () => { isDragging.current = false }
+    document.addEventListener('mouseup', stop)
+    return () => document.removeEventListener('mouseup', stop)
+  }, [])
+
   const categoryMap = Object.fromEntries(categories.map(c => [c.id, c]))
 
-  const handleCellClick = (date, slot) => {
+  const applyCell = (date, slot) => {
     if (!activeCategory) return
     const key = `${date}_${slot}`
-    const current = entries[key]
-    const category_id = current?.category_id === activeCategory.id ? null : activeCategory.id
+    const category_id = paintMode.current === 'erase' ? null : activeCategory.id
+    setEntries(prev => ({ ...prev, [key]: { date, slot, category_id } }))
+    upsertEntry({ date, slot, category_id })
     if (category_id != null) onPaint(category_id)
-    upsertEntry({ date, slot, category_id }).then(updated => {
-      setEntries(prev => ({ ...prev, [key]: updated }))
-    })
+  }
+
+  const handleMouseDown = (e, date, slot) => {
+    if (!activeCategory) return
+    e.preventDefault()
+    const key = `${date}_${slot}`
+    const isSame = entries[key]?.category_id === activeCategory.id
+    paintMode.current = isSame ? 'erase' : 'paint'
+    isDragging.current = true
+    applyCell(date, slot)
+  }
+
+  const handleMouseEnter = (date, slot) => {
+    if (!isDragging.current) return
+    applyCell(date, slot)
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
+    <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900 select-none">
       <table className="border-collapse min-w-full">
         <thead>
           <tr className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
@@ -84,13 +105,14 @@ export default function Grid({ startDate, dayCount, categories, activeCategory, 
                   return (
                     <td
                       key={date}
-                      onClick={() => handleCellClick(date, slot)}
-                      className={`border-l relative transition-opacity
+                      onMouseDown={e => handleMouseDown(e, date, slot)}
+                      onMouseEnter={() => handleMouseEnter(date, slot)}
+                      className={`border-l relative
                         ${isHour
                           ? 'border-t border-slate-200 dark:border-zinc-700'
                           : 'border-t border-slate-100 dark:border-zinc-800'}
                         ${isToday && !cat ? 'bg-indigo-50/40 dark:bg-indigo-950/20' : ''}
-                        ${activeCategory ? 'cursor-pointer' : 'cursor-default'}
+                        ${activeCategory ? 'cursor-crosshair' : 'cursor-default'}
                       `}
                       style={{ backgroundColor: cat?.color }}
                     >

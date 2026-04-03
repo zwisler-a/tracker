@@ -44,7 +44,8 @@ export default function Toolbar({ dayCount, onDayCountChange, startDate, onNavig
         ))}
       </div>
 
-      <button onClick={() => routerNavigate('/settings')} className={iconBtn}>⚙</button>
+      <button onClick={() => routerNavigate('/insights')} className={iconBtn} title="Insights">◎</button>
+      <button onClick={() => routerNavigate('/settings')} className={iconBtn} title="Settings">⚙</button>
     </div>
   )
 }
