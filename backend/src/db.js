@@ -22,4 +22,9 @@ await db.exec(`
     category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
     UNIQUE(date, slot)
   );
+
+  CREATE TABLE IF NOT EXISTS moods (
+    date TEXT PRIMARY KEY,
+    mood INTEGER NOT NULL
+  );
 `)

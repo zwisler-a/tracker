@@ -29,6 +29,9 @@ export const fetchEntries      = (from, to)   => get(`${BASE}/entries?from=${fro
 export const upsertEntry       = (data)       => put(`${BASE}/entries`, data)
 export const bulkUpsertEntries = (entries)    => put(`${BASE}/entries/bulk`, entries)
 
+export const fetchMoods        = (from, to)   => get(`${BASE}/moods?from=${from}&to=${to}`)
+export const upsertMood        = (data)       => put(`${BASE}/moods`, data)
+
 export const login = (password) =>
   fetch(`${BASE}/auth/login`, {
     method: 'POST',

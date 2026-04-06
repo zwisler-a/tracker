@@ -8,6 +8,7 @@ import { requireAuth } from './middleware/auth.js'
 import authRouter from './routes/auth.js'
 import categoriesRouter from './routes/categories.js'
 import entriesRouter from './routes/entries.js'
+import moodsRouter from './routes/moods.js'
 
 const app = express()
 app.use(cors())
@@ -19,6 +20,7 @@ app.use('/api/auth', authRouter)
 // Protected
 app.use('/api/categories', requireAuth, categoriesRouter)
 app.use('/api/entries',    requireAuth, entriesRouter)
+app.use('/api/moods',     requireAuth, moodsRouter)
 
 // Serve frontend static files in production (single-container deployment)
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public')

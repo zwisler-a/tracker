@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchEntries, upsertEntry } from '../api.js'
+import { fetchEntries, upsertEntry, fetchMoods, upsertMood } from '../api.js'
 import { addDays, todayStr } from '../utils/dates.js'
+
+const MOODS = [null, '😄', '🙂', '😐', '😔', '😢']
 
 const SLOTS = Array.from({ length: 48 }, (_, i) => i)
 const TODAY = todayStr()
@@ -17,6 +19,7 @@ function formatDayHeader(dateStr) {
 
 export default function Grid({ startDate, dayCount, categories, activeCategory, onPaint }) {
   const [entries, setEntries] = useState({})
+  const [moods, setMoods] = useState({})
   const isDragging = useRef(false)
   const paintMode = useRef('paint') // 'paint' | 'erase'
 
@@ -29,7 +32,18 @@ export default function Grid({ startDate, dayCount, categories, activeCategory, 
       data.forEach(e => { map[`${e.date}_${e.slot}`] = e })
       setEntries(map)
     })
+    fetchMoods(startDate, endDate).then(data => {
+      const map = {}
+      data.forEach(m => { map[m.date] = m.mood })
+      setMoods(map)
+    })
   }, [startDate, endDate])
+
+  const handleMoodChange = (e, date) => {
+    const next = e.target.value === '' ? null : Number(e.target.value)
+    setMoods(prev => ({ ...prev, [date]: next }))
+    upsertMood({ date, mood: next })
+  }
 
   useEffect(() => {
     const stop = () => { isDragging.current = false }
@@ -71,16 +85,28 @@ export default function Grid({ startDate, dayCount, categories, activeCategory, 
             <th className="w-12 border-b border-slate-200 dark:border-zinc-700" />
             {dates.map(date => {
               const isToday = date === TODAY
+              const mood = moods[date] ?? 0
               return (
                 <th
                   key={date}
-                  className={`border-b border-l border-slate-200 dark:border-zinc-700 px-2 py-2 text-xs font-semibold text-center min-w-[90px] ${
+                  className={`border-b border-l border-slate-200 dark:border-zinc-700 px-2 py-1 text-xs font-semibold text-center min-w-[90px] ${
                     isToday
                       ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40'
                       : 'text-slate-500 dark:text-zinc-400'
                   }`}
                 >
-                  {formatDayHeader(date)}
+                  <div>{formatDayHeader(date)}</div>
+                  <select
+                    value={mood || ''}
+                    onMouseDown={e => e.stopPropagation()}
+                    onChange={e => handleMoodChange(e, date)}
+                    className="mt-0.5 text-base leading-none bg-transparent border-none outline-none cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
+                  >
+                    <option value="">·</option>
+                    {MOODS.slice(1).map((emoji, i) => (
+                      <option key={i + 1} value={i + 1}>{emoji}</option>
+                    ))}
+                  </select>
                 </th>
               )
             })}
