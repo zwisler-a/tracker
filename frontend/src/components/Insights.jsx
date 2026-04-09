@@ -54,7 +54,14 @@ export default function Insights({ categories }) {
     if (!dailyMap[e.date]) dailyMap[e.date] = { date: e.date, label: e.date.slice(5) }
     if (e.category_id) dailyMap[e.date][e.category_id] = (dailyMap[e.date][e.category_id] || 0) + 0.5
   })
-  const dailyData = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date))
+  const catIds = catData.map(d => d.id)
+  const dailyData = Object.values(dailyMap)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(row => {
+      const filled = { ...row }
+      catIds.forEach(id => { if (filled[id] === undefined) filled[id] = 0 })
+      return filled
+    })
 
   // Time-of-day category distribution
   const slotCatCounts = Array.from({ length: 48 }, () => ({}))

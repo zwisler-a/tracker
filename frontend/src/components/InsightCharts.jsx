@@ -187,7 +187,7 @@ export function UsageOverDays({ dailyData, catData, days }) {
               <YAxis tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" />
               <Tooltip content={<UsageTooltip />} cursor={{ stroke: 'rgba(99,102,241,0.15)', strokeWidth: 1 }} />
               {catData.map(d => (
-                <Line key={d.id} type="monotone" dataKey={d.id} name={d.name} stroke={d.color} strokeWidth={2} dot={false} activeDot={{ r: 3 }} connectNulls={false} />
+                <Line key={d.id} type="monotone" dataKey={d.id} name={d.name} stroke={d.color} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
               ))}
             </LineChart>
           </ResponsiveContainer>
