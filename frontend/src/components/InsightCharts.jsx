@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 const card = 'bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 p-4'
 const sectionLabel = 'text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wide mb-3'
@@ -147,6 +147,49 @@ export function TimeHeatmap({ slotCatCounts, catData }) {
                 <Area key={d.id} type="monotone" dataKey={d.id} name={d.name} stroke={d.color} fill={d.color} fillOpacity={0.15} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
               ))}
             </AreaChart>
+          </ResponsiveContainer>
+        )
+      }
+    </div>
+  )
+}
+
+function UsageTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const items = payload.filter(p => p.value > 0).sort((a, b) => b.value - a.value)
+  if (!items.length) return null
+  return (
+    <div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs space-y-1">
+      <p className="font-semibold text-slate-500 dark:text-zinc-400">{label}</p>
+      {items.map(p => (
+        <div key={p.dataKey} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+          <span className="text-slate-600 dark:text-zinc-300">{p.name}</span>
+          <span className="font-semibold text-slate-800 dark:text-zinc-100 ml-auto pl-3">{p.value?.toFixed(1)}h</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function UsageOverDays({ dailyData, catData, days }) {
+  const hasData = dailyData.length > 0
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Usage Over Days</p>
+      {!hasData
+        ? <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No data yet</p>
+        : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={dailyData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" />
+              <Tooltip content={<UsageTooltip />} cursor={{ stroke: 'rgba(99,102,241,0.15)', strokeWidth: 1 }} />
+              {catData.map(d => (
+                <Line key={d.id} type="monotone" dataKey={d.id} name={d.name} stroke={d.color} strokeWidth={2} dot={false} activeDot={{ r: 3 }} connectNulls={false} />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         )
       }

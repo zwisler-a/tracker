@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEntries } from '../api.js'
 import { todayStr, addDays } from '../utils/dates.js'
-import { CategoryDonut, DailyBars, TimeHeatmap } from './InsightCharts.jsx'
+import { CategoryDonut, DailyBars, TimeHeatmap, UsageOverDays } from './InsightCharts.jsx'
 
 const RANGES = [7, 30, 90]
 
@@ -137,6 +137,7 @@ export default function Insights({ categories }) {
 
         <CategoryDonut catData={catData} totalHours={totalHours} />
         <DailyBars dailyData={dailyData} catData={catData} days={days} />
+        <UsageOverDays dailyData={dailyData} catData={catData} days={days} />
         <TimeHeatmap slotCatCounts={slotCatCounts} catData={catData} />
       </div>
     </div>
