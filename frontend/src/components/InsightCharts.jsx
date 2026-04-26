@@ -1,4 +1,5 @@
-import { PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { useState } from 'react'
+import { PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 const card = 'bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 p-4'
 const sectionLabel = 'text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wide mb-3'
@@ -168,6 +169,203 @@ function UsageTooltip({ active, payload, label }) {
           <span className="font-semibold text-slate-800 dark:text-zinc-100 ml-auto pl-3">{p.value?.toFixed(1)}h</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function HourTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const p = payload[0]
+  return (
+    <div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs">
+      <p className="font-semibold text-slate-500 dark:text-zinc-400 mb-1">{label}:00 – {label}:59</p>
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.fill }} />
+        <span className="text-slate-600 dark:text-zinc-300">{p.name}</span>
+        <span className="font-semibold text-slate-800 dark:text-zinc-100 ml-auto pl-3">{p.value?.toFixed(1)}%</span>
+      </div>
+    </div>
+  )
+}
+
+export function CategoryHourProfile({ slotCatCounts, catData }) {
+  const [selectedId, setSelectedId] = useState(() => catData[0]?.id ?? null)
+
+  // Keep selectedId valid when catData changes
+  const selected = catData.find(d => d.id === selectedId) ?? catData[0]
+
+  const hourData = Array.from({ length: 24 }, (_, h) => {
+    const count = (slotCatCounts[h * 2][selected?.id] || 0) + (slotCatCounts[h * 2 + 1][selected?.id] || 0)
+    return { h, label: String(h).padStart(2, '0'), count }
+  })
+
+  const total = hourData.reduce((s, r) => s + r.count, 0)
+  const data = hourData.map(r => ({ ...r, pct: total > 0 ? +(r.count / total * 100).toFixed(1) : 0 }))
+  const peak = data.reduce((best, r) => r.pct > best.pct ? r : best, data[0])
+
+  if (catData.length === 0) {
+    return (
+      <div className={card}>
+        <p className={sectionLabel}>Peak Hour by Category</p>
+        <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No data yet</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Peak Hour by Category</p>
+
+      {/* Category selector */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {catData.map(d => {
+          const active = d.id === selected?.id
+          return (
+            <button
+              key={d.id}
+              onClick={() => setSelectedId(d.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                active
+                  ? 'border-transparent text-white'
+                  : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400'
+              }`}
+              style={active ? { backgroundColor: d.color } : {}}
+            >
+              {active && <span className="w-1.5 h-1.5 rounded-full bg-white/50" />}
+              {d.name}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Peak annotation */}
+      {total > 0 && (
+        <p className="text-xs text-slate-500 dark:text-zinc-400 mb-2">
+          Peak: <span className="font-semibold" style={{ color: selected?.color }}>{peak.label}:00 – {peak.label}:59</span>
+          <span className="ml-1 text-slate-400 dark:text-zinc-500">({peak.pct.toFixed(1)}% of activity)</span>
+        </p>
+      )}
+
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={data} barSize={8} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" interval={3} />
+          <YAxis tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" tickFormatter={v => `${v}%`} />
+          <Tooltip content={<HourTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+          {total > 0 && <ReferenceLine x={peak.label} stroke={selected?.color} strokeDasharray="3 3" strokeOpacity={0.6} />}
+          <Bar dataKey="pct" name={selected?.name} radius={[3, 3, 0, 0]}>
+            {data.map(r => (
+              <Cell key={r.h} fill={selected?.color} fillOpacity={r.h === peak.h && total > 0 ? 1 : 0.35} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function HourHeatmap({ slotCatCounts, catData }) {
+  const [tooltip, setTooltip] = useState(null) // { cat, h, pct, x, y }
+
+  if (catData.length === 0) {
+    return (
+      <div className={card}>
+        <p className={sectionLabel}>Hour Heatmap</p>
+        <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No data yet</p>
+      </div>
+    )
+  }
+
+  // Per-category, per-hour counts and peak-normalised intensity
+  const rows = catData.map(d => {
+    const hours = Array.from({ length: 24 }, (_, h) => ({
+      h,
+      count: (slotCatCounts[h * 2][d.id] || 0) + (slotCatCounts[h * 2 + 1][d.id] || 0),
+    }))
+    const total = hours.reduce((s, r) => s + r.count, 0)
+    const peak = Math.max(...hours.map(r => r.count), 1)
+    return {
+      ...d,
+      hours: hours.map(r => ({
+        ...r,
+        intensity: r.count / peak,
+        pct: total > 0 ? +(r.count / total * 100).toFixed(1) : 0,
+      })),
+      total,
+    }
+  })
+
+  const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Hour Heatmap</p>
+
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: 520 }}>
+          {/* Hour axis */}
+          <div className="flex mb-1 pl-20">
+            {HOURS.map((h, i) => (
+              <div key={h} className="flex-1 text-center text-[9px] text-slate-400 dark:text-zinc-500 leading-none">
+                {i % 3 === 0 ? h : ''}
+              </div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {rows.map(row => (
+            <div key={row.id} className="flex items-center mb-1 gap-1">
+              {/* Category label */}
+              <div className="w-20 shrink-0 flex items-center gap-1.5 overflow-hidden">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: row.color }} />
+                <span className="text-[11px] text-slate-600 dark:text-zinc-300 truncate leading-none">{row.name}</span>
+              </div>
+
+              {/* Cells */}
+              {row.hours.map(cell => (
+                <div
+                  key={cell.h}
+                  className="flex-1 h-6 rounded-sm cursor-default relative"
+                  style={{
+                    backgroundColor: row.color,
+                    opacity: row.total === 0 ? 0.08 : Math.max(cell.intensity * 0.9 + 0.1, cell.intensity === 0 ? 0.05 : 0.1),
+                  }}
+                  onMouseEnter={e => {
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    setTooltip({ cat: row.name, color: row.color, h: cell.h, pct: cell.pct, count: cell.count, rect })
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                />
+              ))}
+            </div>
+          ))}
+
+          {/* Bottom axis repeated for scrolled views */}
+          <div className="flex mt-1 pl-20">
+            {HOURS.map((h, i) => (
+              <div key={h} className="flex-1 text-center text-[9px] text-slate-400 dark:text-zinc-500 leading-none">
+                {i % 6 === 0 ? h : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tooltip (portal-style fixed overlay) */}
+      {tooltip && (
+        <div
+          className="fixed z-50 pointer-events-none bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs"
+          style={{ left: tooltip.rect.left + tooltip.rect.width / 2, top: tooltip.rect.top - 8, transform: 'translate(-50%, -100%)' }}
+        >
+          <p className="font-semibold text-slate-500 dark:text-zinc-400 mb-1">
+            {String(tooltip.h).padStart(2, '0')}:00 – {String(tooltip.h).padStart(2, '0')}:59
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tooltip.color }} />
+            <span className="text-slate-600 dark:text-zinc-300">{tooltip.cat}</span>
+            <span className="font-semibold text-slate-800 dark:text-zinc-100 ml-auto pl-3">{tooltip.pct}%</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
