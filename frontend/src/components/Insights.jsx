@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEntries } from '../api.js'
 import { todayStr, addDays } from '../utils/dates.js'
-import { CategoryDonut, DailyBars, TimeHeatmap, UsageOverDays, CategoryHourProfile, HourHeatmap, WeekdayHeatmap, ConcentrationBlocks } from './InsightCharts.jsx'
+import { CategoryDonut, DailyBars, UsageOverDays, CategoryHourProfile, HourHeatmap, WeekdayHeatmap, ConcentrationBlocks } from './InsightCharts.jsx'
 
 const RANGES = [7, 30, 90]
 
@@ -14,6 +14,25 @@ function StatCard({ label, value, sub, accent }) {
         {value}
       </span>
       {sub && <span className="text-xs text-slate-400 dark:text-zinc-500">{sub}</span>}
+    </div>
+  )
+}
+
+function Section({ title, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 w-full py-2 group"
+      >
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-zinc-500 group-hover:text-slate-600 dark:group-hover:text-zinc-300 transition-colors">
+          {title}
+        </span>
+        <span className="flex-1 h-px bg-slate-200 dark:bg-zinc-700" />
+        <span className={`text-slate-300 dark:text-zinc-600 text-xs transition-transform duration-200 ${open ? '' : '-rotate-90'}`}>▾</span>
+      </button>
+      {open && <div className="space-y-3">{children}</div>}
     </div>
   )
 }
@@ -48,7 +67,7 @@ export default function Insights({ categories }) {
     .filter(d => d.name)
     .sort((a, b) => b.hours - a.hours)
 
-  // Daily data for stacked bar
+  // Daily data for stacked bar / line
   const dailyMap = {}
   visible.forEach(e => {
     if (!dailyMap[e.date]) dailyMap[e.date] = { date: e.date, label: e.date.slice(5) }
@@ -63,7 +82,7 @@ export default function Insights({ categories }) {
       return filled
     })
 
-  // Time-of-day category distribution
+  // Time-of-day distribution
   const slotCatCounts = Array.from({ length: 48 }, () => ({}))
   visible.forEach(e => {
     if (e.category_id) slotCatCounts[e.slot][e.category_id] = (slotCatCounts[e.slot][e.category_id] || 0) + 1
@@ -74,12 +93,12 @@ export default function Insights({ categories }) {
   visible.forEach(e => {
     if (!e.category_id) return
     const d = new Date(e.date + 'T12:00:00')
-    const dow = (d.getDay() + 6) % 7 // shift Sun(0)→6, Mon(1)→0
+    const dow = (d.getDay() + 6) % 7
     weekdayCatCounts[dow][e.category_id] = (weekdayCatCounts[dow][e.category_id] || 0) + 1
   })
 
-  // Concentration blocks: consecutive same-category slots within a day
-  const blocksByCat = {} // id → [{ slots }]
+  // Concentration blocks
+  const blocksByCat = {}
   const byDate = {}
   visible.forEach(e => {
     if (!e.category_id) return
@@ -93,9 +112,8 @@ export default function Insights({ categories }) {
       const catId = dayEntries[i].category_id
       let j = i + 1
       while (j < dayEntries.length && dayEntries[j].category_id === catId && dayEntries[j].slot === dayEntries[j - 1].slot + 1) j++
-      const len = j - i
       if (!blocksByCat[catId]) blocksByCat[catId] = []
-      blocksByCat[catId].push(len)
+      blocksByCat[catId].push(j - i)
       i = j
     }
   })
@@ -104,7 +122,6 @@ export default function Insights({ categories }) {
   const activeDays = new Set(visible.filter(e => e.category_id).map(e => e.date)).size
   const topCat = catData[0]
 
-  // All categories that appear in raw entries (for filter chips)
   const allCatIds = [...new Set(entries.map(e => e.category_id).filter(Boolean))]
   const allCats = allCatIds.map(id => categoryMap[id]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
 
@@ -137,7 +154,8 @@ export default function Insights({ categories }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-3">
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+
         {/* Category filter chips */}
         {allCats.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -161,26 +179,40 @@ export default function Insights({ categories }) {
             })}
           </div>
         )}
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Hours tracked" value={totalHours.toFixed(1)} sub={`last ${days} days`} />
-          <StatCard label="Active days" value={activeDays} sub={`of ${days}`} />
-          <StatCard
-            label="Top category"
-            value={topCat?.name ?? '—'}
-            sub={topCat ? `${topCat.hours.toFixed(1)}h` : 'no data'}
-            accent={topCat?.color}
-          />
-        </div>
 
-        <CategoryDonut catData={catData} totalHours={totalHours} />
-        <DailyBars dailyData={dailyData} catData={catData} days={days} />
-        <UsageOverDays dailyData={dailyData} catData={catData} days={days} />
-        <TimeHeatmap slotCatCounts={slotCatCounts} catData={catData} />
-        <HourHeatmap slotCatCounts={slotCatCounts} catData={catData} />
-        <WeekdayHeatmap weekdayCatCounts={weekdayCatCounts} catData={catData} />
-        <ConcentrationBlocks blocksByCat={blocksByCat} catData={catData} />
-        <CategoryHourProfile slotCatCounts={slotCatCounts} catData={catData} />
+        {/* ── Summary ── */}
+        <Section title="Summary">
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Hours tracked" value={totalHours.toFixed(1)} sub={`last ${days} days`} />
+            <StatCard label="Active days" value={activeDays} sub={`of ${days}`} />
+            <StatCard
+              label="Top category"
+              value={topCat?.name ?? '—'}
+              sub={topCat ? `${topCat.hours.toFixed(1)}h` : 'no data'}
+              accent={topCat?.color}
+            />
+          </div>
+          <CategoryDonut catData={catData} totalHours={totalHours} />
+        </Section>
+
+        {/* ── Activity ── */}
+        <Section title="Activity over time">
+          <DailyBars dailyData={dailyData} catData={catData} days={days} />
+          <UsageOverDays dailyData={dailyData} catData={catData} days={days} />
+        </Section>
+
+        {/* ── Patterns ── */}
+        <Section title="Patterns">
+          <HourHeatmap slotCatCounts={slotCatCounts} catData={catData} />
+          <WeekdayHeatmap weekdayCatCounts={weekdayCatCounts} catData={catData} />
+          <CategoryHourProfile slotCatCounts={slotCatCounts} catData={catData} />
+        </Section>
+
+        {/* ── Focus ── */}
+        <Section title="Focus & flow">
+          <ConcentrationBlocks blocksByCat={blocksByCat} catData={catData} />
+        </Section>
+
       </div>
     </div>
   )
