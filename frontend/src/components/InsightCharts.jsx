@@ -370,6 +370,214 @@ export function HourHeatmap({ slotCatCounts, catData }) {
   )
 }
 
+function fmtDur(slots) {
+  const h = Math.floor(slots / 2)
+  const m = slots % 2 === 1 ? '30' : '00'
+  return h > 0 ? (m === '00' ? `${h}h` : `${h}h ${m}m`) : `${m}m`
+}
+
+export function ConcentrationBlocks({ blocksByCat, catData }) {
+  const [selectedId, setSelectedId] = useState(() => catData[0]?.id ?? null)
+  const selected = catData.find(d => d.id === selectedId) ?? catData[0]
+
+  if (catData.length === 0) {
+    return (
+      <div className={card}>
+        <p className={sectionLabel}>Concentration Blocks</p>
+        <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No data yet</p>
+      </div>
+    )
+  }
+
+  // Per-category summary stats
+  const stats = catData.map(d => {
+    const blocks = blocksByCat[d.id] ?? []
+    const total = blocks.reduce((s, b) => s + b, 0)
+    const avg = blocks.length ? total / blocks.length : 0
+    const max = blocks.length ? Math.max(...blocks) : 0
+    return { ...d, count: blocks.length, avg, max }
+  })
+
+  // Distribution histogram for selected category (bucket by slot count)
+  const blocks = blocksByCat[selected?.id] ?? []
+  const maxLen = blocks.length ? Math.max(...blocks) : 0
+  const buckets = Array.from({ length: maxLen }, (_, i) => ({
+    slots: i + 1,
+    label: fmtDur(i + 1),
+    count: blocks.filter(b => b === i + 1).length,
+  })).filter(b => b.count > 0 || b.slots <= maxLen)
+
+  // Build a full 1..maxLen distribution for the bar chart (include zeros so the axis is continuous)
+  const distData = maxLen > 0
+    ? Array.from({ length: Math.min(maxLen, 32) }, (_, i) => ({
+        slots: i + 1,
+        label: fmtDur(i + 1),
+        count: blocks.filter(b => b === i + 1).length,
+      }))
+    : []
+
+  const selectedStats = stats.find(s => s.id === selected?.id)
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Concentration Blocks</p>
+
+      {/* Per-category summary rows */}
+      <div className="space-y-2 mb-4">
+        {stats.map(s => {
+          const active = s.id === selected?.id
+          const barW = s.max > 0 ? (s.avg / s.max) * 100 : 0
+          return (
+            <button
+              key={s.id}
+              onClick={() => setSelectedId(s.id)}
+              className={`w-full text-left rounded-xl p-2.5 border transition-all ${
+                active
+                  ? 'border-transparent shadow-sm'
+                  : 'border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/40 hover:border-slate-200 dark:hover:border-zinc-700'
+              }`}
+              style={active ? { backgroundColor: s.color + '18', borderColor: s.color + '55' } : {}}
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                <span className="text-xs font-medium text-slate-700 dark:text-zinc-200 flex-1 truncate">{s.name}</span>
+                <span className="text-[11px] text-slate-400 dark:text-zinc-500 shrink-0">{s.count} block{s.count !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 bg-slate-100 dark:bg-zinc-700 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${barW}%`, backgroundColor: s.color }} />
+                </div>
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 shrink-0 w-24 text-right">
+                  avg {fmtDur(Math.round(s.avg))} · max {fmtDur(s.max)}
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Distribution chart for selected */}
+      {distData.length > 0 && (
+        <>
+          <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-2">
+            Block length distribution —{' '}
+            <span className="font-semibold" style={{ color: selected?.color }}>{selected?.name}</span>
+          </p>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart data={distData} barSize={Math.max(6, Math.min(20, Math.floor(260 / distData.length)))} margin={{ top: 2, right: 4, left: -28, bottom: 0 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" interval={distData.length > 12 ? Math.ceil(distData.length / 8) - 1 : 0} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null
+                  const d = payload[0].payload
+                  return (
+                    <div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs">
+                      <p className="font-semibold text-slate-500 dark:text-zinc-400 mb-1">{d.label} blocks</p>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: selected?.color }} />
+                        <span className="text-slate-600 dark:text-zinc-300">{selected?.name}</span>
+                        <span className="font-semibold text-slate-800 dark:text-zinc-100 ml-auto pl-3">{d.count}×</span>
+                      </div>
+                    </div>
+                  )
+                }}
+                cursor={{ fill: 'rgba(99,102,241,0.06)' }}
+              />
+              <Bar dataKey="count" radius={[3, 3, 0, 0]} fill={selected?.color} fillOpacity={0.85} />
+            </BarChart>
+          </ResponsiveContainer>
+        </>
+      )}
+    </div>
+  )
+}
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+export function WeekdayHeatmap({ weekdayCatCounts, catData }) {
+  const [tooltip, setTooltip] = useState(null)
+
+  if (catData.length === 0) {
+    return (
+      <div className={card}>
+        <p className={sectionLabel}>Weekday Distribution</p>
+        <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No data yet</p>
+      </div>
+    )
+  }
+
+  const rows = catData.map(d => {
+    const days = WEEKDAYS.map((label, i) => ({
+      i,
+      label,
+      count: weekdayCatCounts[i][d.id] || 0,
+    }))
+    const total = days.reduce((s, r) => s + r.count, 0)
+    const peak = Math.max(...days.map(r => r.count), 1)
+    return {
+      ...d,
+      days: days.map(r => ({
+        ...r,
+        intensity: r.count / peak,
+        pct: total > 0 ? +(r.count / total * 100).toFixed(1) : 0,
+      })),
+      total,
+    }
+  })
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Weekday Distribution</p>
+
+      {/* Header row */}
+      <div className="flex mb-1 pl-20 gap-1">
+        {WEEKDAYS.map(d => (
+          <div key={d} className="flex-1 text-center text-[10px] font-medium text-slate-400 dark:text-zinc-500">{d}</div>
+        ))}
+      </div>
+
+      {rows.map(row => (
+        <div key={row.id} className="flex items-center mb-1 gap-1">
+          <div className="w-20 shrink-0 flex items-center gap-1.5 overflow-hidden">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: row.color }} />
+            <span className="text-[11px] text-slate-600 dark:text-zinc-300 truncate leading-none">{row.name}</span>
+          </div>
+          {row.days.map(cell => (
+            <div
+              key={cell.i}
+              className="flex-1 h-7 rounded-sm cursor-default"
+              style={{
+                backgroundColor: row.color,
+                opacity: row.total === 0 ? 0.08 : Math.max(cell.intensity * 0.9 + 0.1, cell.intensity === 0 ? 0.05 : 0.1),
+              }}
+              onMouseEnter={e => {
+                const rect = e.currentTarget.getBoundingClientRect()
+                setTooltip({ cat: row.name, color: row.color, label: cell.label, pct: cell.pct, rect })
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            />
+          ))}
+        </div>
+      ))}
+
+      {tooltip && (
+        <div
+          className="fixed z-50 pointer-events-none bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs"
+          style={{ left: tooltip.rect.left + tooltip.rect.width / 2, top: tooltip.rect.top - 8, transform: 'translate(-50%, -100%)' }}
+        >
+          <p className="font-semibold text-slate-500 dark:text-zinc-400 mb-1">{tooltip.label}</p>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tooltip.color }} />
+            <span className="text-slate-600 dark:text-zinc-300">{tooltip.cat}</span>
+            <span className="font-semibold text-slate-800 dark:text-zinc-100 ml-auto pl-3">{tooltip.pct}%</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function UsageOverDays({ dailyData, catData, days }) {
   const hasData = dailyData.length > 0
 

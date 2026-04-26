@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEntries } from '../api.js'
 import { todayStr, addDays } from '../utils/dates.js'
-import { CategoryDonut, DailyBars, TimeHeatmap, UsageOverDays, CategoryHourProfile, HourHeatmap } from './InsightCharts.jsx'
+import { CategoryDonut, DailyBars, TimeHeatmap, UsageOverDays, CategoryHourProfile, HourHeatmap, WeekdayHeatmap, ConcentrationBlocks } from './InsightCharts.jsx'
 
 const RANGES = [7, 30, 90]
 
@@ -67,6 +67,37 @@ export default function Insights({ categories }) {
   const slotCatCounts = Array.from({ length: 48 }, () => ({}))
   visible.forEach(e => {
     if (e.category_id) slotCatCounts[e.slot][e.category_id] = (slotCatCounts[e.slot][e.category_id] || 0) + 1
+  })
+
+  // Weekday distribution (0=Mon … 6=Sun)
+  const weekdayCatCounts = Array.from({ length: 7 }, () => ({}))
+  visible.forEach(e => {
+    if (!e.category_id) return
+    const d = new Date(e.date + 'T12:00:00')
+    const dow = (d.getDay() + 6) % 7 // shift Sun(0)→6, Mon(1)→0
+    weekdayCatCounts[dow][e.category_id] = (weekdayCatCounts[dow][e.category_id] || 0) + 1
+  })
+
+  // Concentration blocks: consecutive same-category slots within a day
+  const blocksByCat = {} // id → [{ slots }]
+  const byDate = {}
+  visible.forEach(e => {
+    if (!e.category_id) return
+    if (!byDate[e.date]) byDate[e.date] = []
+    byDate[e.date].push(e)
+  })
+  Object.values(byDate).forEach(dayEntries => {
+    dayEntries.sort((a, b) => a.slot - b.slot)
+    let i = 0
+    while (i < dayEntries.length) {
+      const catId = dayEntries[i].category_id
+      let j = i + 1
+      while (j < dayEntries.length && dayEntries[j].category_id === catId && dayEntries[j].slot === dayEntries[j - 1].slot + 1) j++
+      const len = j - i
+      if (!blocksByCat[catId]) blocksByCat[catId] = []
+      blocksByCat[catId].push(len)
+      i = j
+    }
   })
 
   const totalHours = visible.filter(e => e.category_id).length * 0.5
@@ -147,6 +178,8 @@ export default function Insights({ categories }) {
         <UsageOverDays dailyData={dailyData} catData={catData} days={days} />
         <TimeHeatmap slotCatCounts={slotCatCounts} catData={catData} />
         <HourHeatmap slotCatCounts={slotCatCounts} catData={catData} />
+        <WeekdayHeatmap weekdayCatCounts={weekdayCatCounts} catData={catData} />
+        <ConcentrationBlocks blocksByCat={blocksByCat} catData={catData} />
         <CategoryHourProfile slotCatCounts={slotCatCounts} catData={catData} />
       </div>
     </div>
