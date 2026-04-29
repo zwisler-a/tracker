@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchEntries } from '../api.js'
+import { fetchEntries, fetchMoods } from '../api.js'
 import { todayStr, addDays } from '../utils/dates.js'
-import { CategoryDonut, DailyBars, UsageOverDays, CategoryHourProfile, HourHeatmap, WeekdayHeatmap, ConcentrationBlocks } from './InsightCharts.jsx'
+import { CategoryDonut, DailyBars, UsageOverDays, CategoryHourProfile, HourHeatmap, WeekdayHeatmap, ConcentrationBlocks, MoodOverTime, MoodCorrelation, MoodActivityBreakdown } from './InsightCharts.jsx'
 
 const RANGES = [7, 30, 90]
 
@@ -41,11 +41,19 @@ export default function Insights({ categories }) {
   const navigate = useNavigate()
   const [days, setDays] = useState(30)
   const [entries, setEntries] = useState([])
+  const [moods, setMoods] = useState([])
   const [excluded, setExcluded] = useState(new Set())
   const today = todayStr()
 
   useEffect(() => {
-    fetchEntries(addDays(today, -(days - 1)), today).then(setEntries)
+    const from = addDays(today, -(days - 1))
+    Promise.all([
+      fetchEntries(from, today),
+      fetchMoods(from, today),
+    ]).then(([ents, ms]) => {
+      setEntries(ents)
+      setMoods(ms)
+    })
   }, [days])
 
   const toggleExclude = (id) => setExcluded(prev => {
@@ -122,6 +130,55 @@ export default function Insights({ categories }) {
   const activeDays = new Set(visible.filter(e => e.category_id).map(e => e.date)).size
   const topCat = catData[0]
 
+  // ── Mood data ──────────────────────────────────────────────────────────────
+  // happiness = 6 - moodRaw so 5=😄 and 1=😢 (higher = better)
+  const moodByDate = Object.fromEntries(moods.map(m => [m.date, m.mood]))
+
+  // All dates: union of entry dates and mood-logged dates
+  const allDatesSet = new Set([...Object.keys(dailyMap), ...moods.map(m => m.date)])
+  const dailyDataWithMood = Array.from(allDatesSet)
+    .sort()
+    .map(date => {
+      const row = dailyMap[date] || { date, label: date.slice(5) }
+      const moodRaw = moodByDate[date] ?? null
+      return {
+        ...row,
+        date,
+        label: date.slice(5),
+        moodRaw,
+        happiness: moodRaw != null ? 6 - moodRaw : null,
+        totalHours: catIds.reduce((s, id) => s + (row[id] || 0), 0),
+      }
+    })
+
+  // Pearson correlation per category (happiness vs daily hours)
+  const moodDaysAll = dailyDataWithMood.filter(d => d.happiness !== null)
+  const catMoodCorr = catData.map(d => {
+    if (moodDaysAll.length < 3) return { ...d, corr: null }
+    const pairs = moodDaysAll.map(day => ({ x: day[d.id] || 0, y: day.happiness }))
+    const n = pairs.length
+    const mx = pairs.reduce((s, p) => s + p.x, 0) / n
+    const my = pairs.reduce((s, p) => s + p.y, 0) / n
+    const num = pairs.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0)
+    const dx = Math.sqrt(pairs.reduce((s, p) => s + (p.x - mx) ** 2, 0))
+    const dy = Math.sqrt(pairs.reduce((s, p) => s + (p.y - my) ** 2, 0))
+    const corr = dx * dy > 0 ? num / (dx * dy) : 0
+    return { ...d, corr: +corr.toFixed(2) }
+  }).filter(d => d.corr !== null)
+
+  // Group days by mood level for activity comparison
+  const moodGroups = { good: [], neutral: [], poor: [] }
+  dailyDataWithMood.forEach(day => {
+    if (day.happiness === null) return
+    if (day.happiness >= 4) moodGroups.good.push(day)
+    else if (day.happiness === 3) moodGroups.neutral.push(day)
+    else moodGroups.poor.push(day)
+  })
+
+  // Average mood summary
+  const avgMoodRaw = moods.length > 0 ? moods.reduce((s, m) => s + m.mood, 0) / moods.length : null
+  const avgHappiness = avgMoodRaw != null ? +(6 - avgMoodRaw).toFixed(1) : null
+
   const allCatIds = [...new Set(entries.map(e => e.category_id).filter(Boolean))]
   const allCats = allCatIds.map(id => categoryMap[id]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
 
@@ -182,7 +239,7 @@ export default function Insights({ categories }) {
 
         {/* ── Summary ── */}
         <Section title="Summary">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <StatCard label="Hours tracked" value={totalHours.toFixed(1)} sub={`last ${days} days`} />
             <StatCard label="Active days" value={activeDays} sub={`of ${days}`} />
             <StatCard
@@ -190,6 +247,11 @@ export default function Insights({ categories }) {
               value={topCat?.name ?? '—'}
               sub={topCat ? `${topCat.hours.toFixed(1)}h` : 'no data'}
               accent={topCat?.color}
+            />
+            <StatCard
+              label="Avg mood"
+              value={avgHappiness != null ? (['', '😢', '😔', '😐', '🙂', '😄'][Math.round(avgHappiness)]) : '—'}
+              sub={moods.length > 0 ? `${moods.length} day${moods.length !== 1 ? 's' : ''} tracked` : 'no mood data'}
             />
           </div>
           <CategoryDonut catData={catData} totalHours={totalHours} />
@@ -211,6 +273,13 @@ export default function Insights({ categories }) {
         {/* ── Focus ── */}
         <Section title="Focus & flow">
           <ConcentrationBlocks blocksByCat={blocksByCat} catData={catData} />
+        </Section>
+
+        {/* ── Mood ── */}
+        <Section title="Mood & correlation">
+          <MoodOverTime dailyDataWithMood={dailyDataWithMood} />
+          <MoodCorrelation catMoodCorr={catMoodCorr} />
+          <MoodActivityBreakdown moodGroups={moodGroups} catData={catData} />
         </Section>
 
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 const card = 'bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 p-4'
 const sectionLabel = 'text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wide mb-3'
@@ -599,6 +599,223 @@ export function UsageOverDays({ dailyData, catData, days }) {
           </ResponsiveContainer>
         )
       }
+    </div>
+  )
+}
+
+// ── Mood charts ─────────────────────────────────────────────────────────────
+
+const HAPPINESS_EMOJIS = ['', '😢', '😔', '😐', '🙂', '😄'] // index = happiness (1-5)
+
+function MoodTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const hoursEntry = payload.find(p => p.dataKey === 'totalHours')
+  const moodEntry = payload.find(p => p.dataKey === 'happiness')
+  return (
+    <div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs space-y-1">
+      <p className="font-semibold text-slate-500 dark:text-zinc-400">{label}</p>
+      {moodEntry?.value != null && (
+        <div className="flex items-center gap-2">
+          <span className="text-base leading-none">{HAPPINESS_EMOJIS[Math.round(moodEntry.value)]}</span>
+          <span className="text-slate-600 dark:text-zinc-300">Mood</span>
+        </div>
+      )}
+      {hoursEntry?.value > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-indigo-400" />
+          <span className="text-slate-600 dark:text-zinc-300">Activity</span>
+          <span className="font-semibold ml-auto pl-3">{hoursEntry.value.toFixed(1)}h</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function MoodOverTime({ dailyDataWithMood }) {
+  const hasMood = dailyDataWithMood.some(d => d.happiness !== null)
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Mood Over Time</p>
+      {!hasMood
+        ? <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No mood data yet — log your mood in the grid view</p>
+        : (
+          <>
+            <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-2">
+              Bars = total tracked hours &nbsp;·&nbsp; Line = mood &nbsp;·&nbsp; {HAPPINESS_EMOJIS[5]} great &nbsp;→&nbsp; {HAPPINESS_EMOJIS[1]} rough
+            </p>
+            <ResponsiveContainer width="100%" height={180}>
+              <ComposedChart data={dailyDataWithMood} margin={{ top: 4, right: 28, left: -28, bottom: 0 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" interval="preserveStartEnd" />
+                <YAxis yAxisId="hours" tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" />
+                <YAxis
+                  yAxisId="mood"
+                  orientation="right"
+                  domain={[1, 5]}
+                  ticks={[1, 2, 3, 4, 5]}
+                  tick={{ fontSize: 11, fill: 'currentColor' }}
+                  tickLine={false}
+                  axisLine={false}
+                  className="text-slate-400 dark:text-zinc-500"
+                  tickFormatter={v => HAPPINESS_EMOJIS[v] || ''}
+                  width={22}
+                />
+                <Tooltip content={<MoodTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                <Bar yAxisId="hours" dataKey="totalHours" fill="#6366f1" fillOpacity={0.2} radius={[2, 2, 0, 0]} />
+                <Line yAxisId="mood" type="monotone" dataKey="happiness" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3, strokeWidth: 0 }} activeDot={{ r: 4 }} connectNulls={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </>
+        )
+      }
+    </div>
+  )
+}
+
+export function MoodCorrelation({ catMoodCorr }) {
+  if (catMoodCorr.length === 0) {
+    return (
+      <div className={card}>
+        <p className={sectionLabel}>Activity → Mood Correlation</p>
+        <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">Need at least 3 days of mood data</p>
+      </div>
+    )
+  }
+
+  const sorted = [...catMoodCorr].sort((a, b) => b.corr - a.corr)
+  const chartHeight = Math.max(sorted.length * 40 + 20, 80)
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Activity → Mood Correlation</p>
+      <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-3">
+        Positive = more of this activity tends to coincide with better mood
+      </p>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart layout="vertical" data={sorted} margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
+          <XAxis
+            type="number"
+            domain={[-1, 1]}
+            tick={{ fontSize: 9, fill: 'currentColor' }}
+            tickLine={false}
+            axisLine={false}
+            className="text-slate-400 dark:text-zinc-500"
+            ticks={[-1, -0.5, 0, 0.5, 1]}
+            tickFormatter={v => v === 0 ? '0' : v > 0 ? `+${v}` : String(v)}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            tick={{ fontSize: 11, fill: 'currentColor' }}
+            tickLine={false}
+            axisLine={false}
+            className="text-slate-600 dark:text-zinc-300"
+            width={80}
+          />
+          <ReferenceLine x={0} stroke="currentColor" strokeOpacity={0.15} className="text-slate-400 dark:text-zinc-600" />
+          <Tooltip
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null
+              const d = payload[0].payload
+              const sign = d.corr > 0 ? '+' : ''
+              const color = d.corr > 0.1 ? '#22c55e' : d.corr < -0.1 ? '#ef4444' : '#94a3b8'
+              return (
+                <div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="font-medium text-slate-700 dark:text-zinc-200">{d.name}</span>
+                  </div>
+                  <p className="text-slate-500 dark:text-zinc-400">
+                    r = <span className="font-semibold" style={{ color }}>{sign}{d.corr}</span>
+                  </p>
+                </div>
+              )
+            }}
+            cursor={{ fill: 'rgba(99,102,241,0.06)' }}
+          />
+          <Bar dataKey="corr" radius={[0, 3, 3, 0]}>
+            {sorted.map(d => (
+              <Cell
+                key={d.id}
+                fill={d.corr > 0.1 ? '#22c55e' : d.corr < -0.1 ? '#ef4444' : '#94a3b8'}
+                fillOpacity={0.5 + Math.min(Math.abs(d.corr) * 0.5, 0.5)}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function MoodActivityBreakdown({ moodGroups, catData }) {
+  const groups = [
+    { key: 'good',    label: '😄 Good',    days: moodGroups.good },
+    { key: 'neutral', label: '😐 Neutral',  days: moodGroups.neutral },
+    { key: 'poor',    label: '😔 Poor',     days: moodGroups.poor },
+  ].filter(g => g.days.length > 0)
+
+  const hasVariety = groups.length >= 2
+
+  if (!hasVariety) {
+    return (
+      <div className={card}>
+        <p className={sectionLabel}>Activity on Good vs Bad Days</p>
+        <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">Need mood data across different days</p>
+      </div>
+    )
+  }
+
+  const data = groups.map(g => {
+    const row = { label: g.label, _count: g.days.length }
+    catData.forEach(d => {
+      row[d.id] = g.days.length > 0
+        ? +(g.days.reduce((s, day) => s + (day[d.id] || 0), 0) / g.days.length).toFixed(2)
+        : 0
+    })
+    return row
+  })
+
+  return (
+    <div className={card}>
+      <p className={sectionLabel}>Activity on Good vs Bad Days</p>
+      <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-3">Average hours per category by mood level</p>
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={data} margin={{ top: 0, right: 0, left: -28, bottom: 0 }}>
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" />
+          <YAxis tick={{ fontSize: 10, fill: 'currentColor' }} tickLine={false} axisLine={false} className="text-slate-400 dark:text-zinc-500" />
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null
+              const items = payload.filter(p => p.value > 0).sort((a, b) => b.value - a.value)
+              const row = payload[0]?.payload
+              return (
+                <div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 rounded-xl px-3 py-2 shadow-lg text-xs space-y-1">
+                  <p className="font-semibold text-slate-500 dark:text-zinc-400">{label} <span className="font-normal">({row?._count} day{row?._count !== 1 ? 's' : ''})</span></p>
+                  {items.map(p => (
+                    <div key={p.dataKey} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.fill }} />
+                      <span className="text-slate-600 dark:text-zinc-300">{p.name}</span>
+                      <span className="font-semibold ml-auto pl-3">{p.value?.toFixed(1)}h</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            }}
+            cursor={{ fill: 'rgba(99,102,241,0.06)' }}
+          />
+          {catData.map((d, i) => (
+            <Bar
+              key={d.id}
+              dataKey={d.id}
+              name={d.name}
+              stackId="a"
+              fill={d.color}
+              radius={i === catData.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
