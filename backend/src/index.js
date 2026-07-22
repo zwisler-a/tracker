@@ -9,6 +9,7 @@ import authRouter from './routes/auth.js'
 import categoriesRouter from './routes/categories.js'
 import entriesRouter from './routes/entries.js'
 import moodsRouter from './routes/moods.js'
+import { startMcpHttpServer } from './mcp/http.js'
 
 const app = express()
 app.use(cors())
@@ -31,3 +32,6 @@ if (existsSync(publicDir)) {
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`))
+
+const MCP_PORT = process.env.MCP_PORT || 3001
+startMcpHttpServer(MCP_PORT)
